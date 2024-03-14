@@ -10,7 +10,7 @@ map = project.maps[0]
 
 print(project.get_data(ids=['42']))
 
-neighbors, distances = map.vector_search(ids=['42'])
+neighbors, distances = map.embeddings.vector_search(ids=['42'])
 
 print(project.get_data(ids=neighbors[0]))
 ```
@@ -40,7 +40,7 @@ dataset = load_dataset('ag_news')['train']
 
 np.random.seed(0)
 max_documents = 25000
-subset_idxs = np.random.randint(len(dataset), size=max_documents).tolist()
+subset_idxs = np.random.choice(len(dataset), size=max_documents, replace=False).tolist()
 documents = [dataset[i] for i in subset_idxs]
 for idx, document in enumerate(documents):
     document['id'] = idx
@@ -64,7 +64,7 @@ map = project.maps[0]
 #batch two vector search queries into one request.
 query_document_ids = [0, 42]
 with project.wait_for_project_lock():
-    neighbors, distances = map.vector_search(ids=query_document_ids, k=10)
+    neighbors, distances = map.embeddings.vector_search(ids=query_document_ids, k=10)
 
 print(neighbors)
 data = project.get_data(ids=query_document_ids)

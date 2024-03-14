@@ -1,4 +1,5 @@
 import json
+import jwt
 import os
 import time
 from pathlib import Path
@@ -13,7 +14,6 @@ tenants = {
 }
 
 nomic_base_path = Path.home() / '.nomic'
-
 
 
 def validate_api_http_response(response):
@@ -35,7 +35,15 @@ def get_api_credentials(fn=None):
         return credentials
 
 
-def login(token, tenant='production'):
+def login(token, tenant='production', domain=None):
+    if tenant == 'enterprise' and domain is None:
+        raise ValueError("Enterprise tenants must specify their deployment domain.")
+
+    if domain is not None:
+        tenants['enterprise'] = {'frontend_domain': domain, 'api_domain': f'api.{domain}'}
+
+    if tenant not in tenants:
+        raise ValueError("Invalid tenant.")
     environment = tenants[tenant]
     auth0_auth_endpoint = f"https://{environment['frontend_domain']}/cli-login"
 
@@ -55,23 +63,43 @@ def login(token, tenant='production'):
     if not nomic_base_path.exists():
         nomic_base_path.mkdir()
 
-    response = requests.get('https://' + environment['api_domain'] + f"/v1/user/token/refresh/{token}")
-    response = validate_api_http_response(response)
 
-    if not response.status_code == 200:
-        raise Exception("Could not authorize you with Nomic. Run `nomic login` to re-authenticate.")
+    expires = None
+    refresh_token = None
 
-    bearer_token = response.json()['access_token']
+    if token.startswith('nk-'):
+        bearer_token = token
+    else:
+        refresh_token = token
+        response = requests.get('https://' + environment['api_domain'] + f"/v1/user/token/refresh/{token}")
+        response = validate_api_http_response(response)
+
+        if not response.status_code == 200:
+            raise Exception("Could not authorize you with Nomic. Run `nomic login` to re-authenticate.")
+        bearer_token = response.json()['access_token']
+        decoded_token = jwt.decode(bearer_token, options={"verify_signature": False})
+        expires = decoded_token['exp']
+
     with open(os.path.join(nomic_base_path, 'credentials'), 'w') as file:
-        json.dump(
-            {'refresh_token': token, 'token': bearer_token, 'tenant': tenant, 'expires': time.time() + 80000}, file
-        )
+        saved_credentials = {
+            'refresh_token': refresh_token,
+            'token': bearer_token,
+            'tenant': tenant,
+            'expires': expires
+        }
+
+        if tenant == 'enterprise':
+            saved_credentials = {**saved_credentials, **environment}
+        json.dump(saved_credentials, file)
 
 
 def refresh_bearer_token():
     credentials = get_api_credentials()
-    if time.time() >= credentials['expires']:
-        environment = tenants[credentials['tenant']]
+    if credentials['expires'] and time.time() >= credentials['expires']:
+        try:
+            environment = tenants[credentials['tenant']]
+        except KeyError:
+            environment = credentials
         response = requests.get(
             'https://' + environment['api_domain'] + f"/v1/user/token/refresh/{credentials['refresh_token']}"
         )
@@ -85,6 +113,7 @@ def refresh_bearer_token():
         with open(os.path.join(nomic_base_path, 'credentials'), 'w') as file:
             json.dump(credentials, file)
     return credentials
+
 
 def switch(tenant):
     assert tenant in ['staging', 'production', None]
@@ -105,12 +134,14 @@ def switch(tenant):
             (nomic_base_path / f'credentials_{tenant}').rename(current_loc)
         else:
             login(token=None, tenant=tenant)
-        
+
 
 @click.command()
+@click.option('--domain', default=None, help='Domain to use for Atlas enterprise login')
 @click.argument('command', nargs=1, default='')
 @click.argument('params', nargs=-1)
-def cli(command, params):
+def cli(command, params, domain=None):
+
     if command == 'login':
         if len(params) == 0:
             login(token=None, tenant='production')
@@ -118,6 +149,14 @@ def cli(command, params):
             login(token=None, tenant='staging')
         if len(params) == 2 and params[0] == 'staging':
             login(token=params[1], tenant='staging')
+        if len(params) == 1 and params[0] == 'enterprise':
+            if domain is None:
+                raise ValueError('Must pass --domain to log into an enterprise environment')
+            login(token=None, tenant='enterprise', domain=domain)
+        if len(params) == 2 and params[0] == 'enterprise':
+            if domain is None:
+                raise ValueError('Must pass --domain to log into an enterprise environment')
+            login(token=params[1], tenant='enterprise', domain=domain)
         if len(params) == 1:
             login(token=params[0], tenant='production')
     elif command == 'switch':
@@ -127,6 +166,7 @@ def cli(command, params):
             switch(tenant=params[0])
     else:
         raise ValueError(f"Command {command} not found.")
-    
+
+
 if __name__ == "__main__":
     cli()

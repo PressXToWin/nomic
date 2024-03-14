@@ -1,13 +1,211 @@
+import base64
 import gc
+import random
 import sys
+from io import BytesIO
+from typing import Optional
+
+import requests
+import pyarrow as pa
 from uuid import UUID
 
-from wonderwords import RandomWord
+import pyarrow as pa
+
+nouns = [
+    'newton',
+    'einstein',
+    'gauss',
+    'pascal',
+    'laplace',
+    'euler',
+    'kepler',
+    'wiles',
+    'neumann',
+    'noether',
+    'bohr',
+    'heisenberg',
+    'planck',
+    'maxwell',
+    'hawking',
+    'feynman',
+    'curie',
+    'poincare',
+    'turing',
+    'nash',
+    'hilbert',
+    'godel',
+    'galois',
+    'ramanujan',
+    'lovelace',
+    'hypatia',
+    'leibniz',
+    'copernicus',
+    'hubble',
+    'darwin',
+    'hooke',
+    'faraday',
+    'pasteur',
+    'mendel',
+    'galvani',
+    'bell',
+    'boltzmann',
+    'dirac',
+    'fermi',
+    'oppenheimer',
+    'schrodinger',
+    'fibonacci',
+    'chatelet',
+    'herschel',
+    'kovalevskaya',
+    'somerville',
+    'franklin',
+    'lepore',
+    'yalow',
+    'jemison',
+    'burnell',
+    'bartik',
+    'spencer',
+    'hamilton',
+    'johnson',
+    'ride',
+    'anning',
+    'meitner',
+    'hopper',
+    'mcclintock',
+    'franklin',
+    'noether',
+    'rubin',
+    'wu',
+    'fermat',
+    'cantor',
+    'jordan',
+    'riemann',
+    'babbage',
+    'dijkstra',
+    'shannon',
+    'erdos',
+    'boole',
+    'lagrange',
+    'lebesgue',
+    'legendre',
+    'gauss',
+    'cauchy',
+    'ramanujan',
+    'weierstrass',
+    'fourier',
+    'cavendish',
+    'lavoisier',
+    'becquerel',
+    'avogadro',
+    'dalton',
+    'rutherford',
+    'thomson',
+    'bose',
+    'fisher',
+    'jaynes',
+    'bernoulli',
+    'alembert',
+    'gibbs',
+    'pareto',
+    'levy',
+    'sierpinski',
+    'hardy',
+    'wigner',
+    'mercator',
+    'ortelius',
+    'speed',
+    'schedel',
+    'waldseemuller',
+    'homann',
+    'rennell',
+    'ogilby',
+    'hondius',
+    'moll',
+    'blaeu',
+    'sanson',
+    'borgonio',
+    'isle',
+    'munster',
+    'hollar',
+    'kitchin',
+    'lecun',
+    'bengio',
+    'hinton',
+    'schmidhuber',
+    'fei-fei',
+    'koller',
+    'russell',
+    'norvig',
+    'vapnik',
+    'avram',
+    'bishop',
+    'goodfellow',
+    'kingma',
+    'arora',
+    'sutton',
+    'breiman',
+]
+
+adjectives = [
+    'curious',
+    'innovative',
+    'analytical',
+    'creative',
+    'logical',
+    'adventurous',
+    'inquisitive',
+    'imaginative',
+    'dynamic',
+    'quirky',
+    'resourceful',
+    'persistent',
+    'observant',
+    'insightful',
+    'intuitive',
+    'experimental',
+    'inspiring',
+    'inventive',
+    'tenacious',
+    'stubborn',
+    'lazy',
+    'disorganized',
+    'inattentive',
+    'careless',
+    'unpredictable',
+    'irrational',
+    'impulsive',
+    'chaotic',
+    'indecisive',
+    'cynical',
+    'neglectful',
+    'overbearing',
+    'oblivious',
+    'inflexible',
+    'lackadaisical',
+    'truculent',
+    'diffident',
+    'lumbering',
+]
+
+
+def arrow_iterator(table: pa.Table):
+    # TODO: setting to 10k so it doesn't take too long?
+    # Wrote this as a generator so we don't realize the whole table in memory
+    reader = table.to_reader(max_chunksize=10_000)
+    for batch in reader:
+        for item in batch.to_pylist():
+            yield item
+
+
+def b64int(i: int):
+    ibytes = int.to_bytes(i, length=8, byteorder='big').lstrip(b'\x00')
+    if ibytes == b'':
+        ibytes = b'\x00'
+    return base64.b64encode(ibytes).decode('utf8').rstrip('=')
 
 
 def get_random_name():
-    random_words = RandomWord()
-    return f"{random_words.word(include_parts_of_speech=['adjectives'])}-{random_words.word(include_parts_of_speech=['nouns'])}"
+    return f"{random.choice(adjectives)}-{random.choice(nouns)}"
 
 
 def assert_valid_project_id(project_id):
@@ -40,3 +238,13 @@ def get_object_size_in_bytes(obj):
         marked.update(new_refr.keys())
 
     return sz
+
+# Helpful function for downloading feather files
+# Best for small feather files
+def download_feather(url: str, path: str, headers: Optional[dict] = None):
+    data = requests.get(url, headers=headers)
+    readable = BytesIO(data.content)
+    readable.seek(0)
+    tb = pa.feather.read_table(readable, memory_map=True)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    pa.feather.write_feather(tb, path)

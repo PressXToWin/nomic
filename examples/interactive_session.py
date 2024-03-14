@@ -5,19 +5,19 @@ dataset = load_dataset('ag_news')['train']
 
 np.random.seed(0)
 max_documents = 25000
-subset_idxs = np.random.randint(len(dataset), size=max_documents).tolist()
+subset_idxs = np.random.choice(len(dataset), size=max_documents, replace=False).tolist()
 documents = [dataset[i] for i in subset_idxs]
 
-project = atlas.map_text(data=documents,
+dataset = atlas.map_data(data=documents,
                           indexed_field='text',
-                          name='News Dataset 25k',
+                          identifier='News Dataset 25k',
                           colorable_fields=['label'],
                           description='News Dataset 25k'
                           )
 
 
-with project.wait_for_project_lock():
-    map = project.get_map(name='News Dataset 25k')
+with dataset.wait_for_dataset_lock():
+    map = dataset.maps[0]
     print(map.map_link)
-    print(project.total_datums)
+    print(dataset.total_datums)
 

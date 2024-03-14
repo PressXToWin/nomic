@@ -1,10 +1,12 @@
 '''Setup file for the Atlas Client'''
 import os
+import sys
 from setuptools import setup, find_packages
-description = 'The offical Nomic python client.'
+description = 'The official Nomic python client.'
+    
 setup(
     name='nomic',
-    version='1.1.4',
+    version='3.0.15',
     url='https://github.com/nomic-ai/nomic',
     description=description,
     long_description=description,
@@ -22,11 +24,12 @@ setup(
         'rich',
         'requests',
         'numpy',
+        'pandas',
         'pydantic',
-        'wonderwords',
         'tqdm',
-        'cohere',
         'pyarrow',
+        'pillow',
+        'pyjwt'
     ],
     extras_require={
         'dev': [
@@ -42,13 +45,8 @@ setup(
             "mkdocs-jupyter",
             "pillow",
             "cairosvg"
-        ],
-        'gpt4all': [
-            'torch',
-            'sentencepiece',
-            f"transformers @ file://localhost/{os.getcwd()}/bin/transformers-4.28.0.dev0-py3-none-any.whl",
-            f"peft @ file://localhost/{os.getcwd()}/bin/peft-0.3.0.dev0-py3-none-any.whl"
         ]
+
     },
     entry_points={
         'console_scripts': ['nomic=nomic.cli:cli'],

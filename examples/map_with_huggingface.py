@@ -8,7 +8,7 @@ from datasets import load_dataset
 #make dataset
 max_documents = 10000
 dataset = load_dataset("sentiment140")['train']
-documents = [dataset[i] for i in np.random.randint(len(dataset), size=max_documents).tolist()]
+documents = [dataset[i] for i in np.random.choice(len(dataset), size=max_documents, replace=False).tolist()]
 
 
 model = AutoModel.from_pretrained("prajjwal1/bert-mini")
@@ -27,10 +27,9 @@ with torch.no_grad():
 embeddings = torch.cat(embeddings).numpy()
 print(embeddings.shape)
 
-response = atlas.map_embeddings(embeddings=embeddings,
+response = atlas.map_data(embeddings=embeddings,
                                 data=documents,
-                                colorable_fields=['sentiment'],
-                                name="Huggingface Model Example",
+                                identifier="Huggingface Model Example",
                                 description="An example of building a text map with a huggingface model.")
 
 print(response)
